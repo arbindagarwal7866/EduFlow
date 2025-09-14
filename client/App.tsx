@@ -10,6 +10,8 @@ import Index from "./pages/Index";
 import NotFound from "./pages/NotFound";
 import Layout from "@/components/eduflow/Layout";
 import Placeholder from "@/pages/Placeholder";
+import Login from "./pages/Login";
+import Signup from "./pages/Signup";
 
 const queryClient = new QueryClient();
 
@@ -21,7 +23,9 @@ const App = () => (
       <BrowserRouter>
         <Routes>
           <Route element={<Layout />}>
-            <Route path="/" element={<Index />} />
+            <Route path="/home" element={<Index />} />
+            <Route path="/" element={<Login />} />
+            <Route path="/signup" element={<Signup />} />
             <Route
               path="/explore"
               element={

@@ -1,5 +1,10 @@
-import { useMemo } from "react";
+"use client";
+import { useMemo, useRef, useEffect, useState } from "react";
+import { gsap } from "gsap";
+import { Observer } from "gsap/Observer";
 import VideoCard, { type VideoItem } from "@/components/eduflow/VideoCard";
+
+gsap.registerPlugin(Observer);
 
 const FEED: VideoItem[] = [
   {
@@ -10,9 +15,7 @@ const FEED: VideoItem[] = [
     subject: "Physics",
     difficulty: "Beginner",
     aiScore: 86,
-    videoUrl: "https://storage.googleapis.com/coverr-main/mp4/Mountain.mp4",
-    captions:
-      "00:00.000 --> 00:02.800\nFirst law: inertia. Objects stay in motion unless acted upon.\n\n00:03.000 --> 00:06.000\nSecond law: F = m a. Force equals mass times acceleration.\n\n00:06.200 --> 00:09.500\nThird law: every action has an equal and opposite reaction.",
+    videoUrl: "http://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4",
   },
   {
     id: "v2",
@@ -22,7 +25,7 @@ const FEED: VideoItem[] = [
     subject: "Languages",
     difficulty: "Beginner",
     aiScore: 78,
-    videoUrl: "https://storage.googleapis.com/coverr-main/mp4/Footboys.mp4",
+    videoUrl: "http://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ElephantsDream.mp4",
   },
   {
     id: "v3",
@@ -32,22 +35,112 @@ const FEED: VideoItem[] = [
     subject: "Computer Science",
     difficulty: "Intermediate",
     aiScore: 91,
-    videoUrl: "https://storage.googleapis.com/coverr-main/mp4/Take_Care.mp4",
+    videoUrl: "http://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4",
   },
 ];
 
 export default function Index() {
   const feed = useMemo(() => FEED, []);
+  const [activeIndex, setActiveIndex] = useState(0);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const videoRefs = useRef<(HTMLVideoElement | null)[]>([]);
+  const isAnimating = useRef(false); // 🚀 lock flag
+
+  // autoplay handling
+ // autoplay handling (always restart when revisiting)
+useEffect(() => {
+  videoRefs.current.forEach((video, i) => {
+    if (!video) return;
+
+    if (i === activeIndex) {
+      video.pause();
+      video.currentTime = 0;  // ⏪ restart
+      video.play().catch(() => {}); // 🔊 safe play
+    } else {
+      video.pause();
+      video.currentTime = 0;
+    }
+  });
+}, [activeIndex]);
+
+
+
+  // scroll/swipe observer
+  useEffect(() => {
+    if (!containerRef.current) return;
+
+    const obs = Observer.create({
+      target: window, // use window for global scroll/swipe
+      type: "wheel,touch,pointer",
+      wheelSpeed: -2,
+      tolerance: 20, // prevent micro scroll noise
+      onUp: () => {
+        if (activeIndex < feed.length - 1 && !isAnimating.current) {
+          goTo(activeIndex + 1);
+        }
+      },
+      onDown: () => {
+        if (activeIndex > 0 && !isAnimating.current) {
+          goTo(activeIndex - 1);
+        }
+      },
+    });
+
+    return () => obs.kill();
+  }, [activeIndex]);
+
+  const goTo = (index: number) => {
+    if (!containerRef.current) return;
+    const slides = gsap.utils.toArray<HTMLElement>(
+      containerRef.current.querySelectorAll(".short")
+    );
+
+    const current = slides[activeIndex];
+    const next = slides[index];
+    if (!current || !next) return;
+
+    const direction = index > activeIndex ? 1 : -1;
+
+    isAnimating.current = true; // 🔒 lock transition
+
+    const tl = gsap.timeline({
+      onComplete: () => {
+        setActiveIndex(index);
+        isAnimating.current = false; // 🔓 unlock when done
+      },
+    });
+
+    tl.to(current, {
+      yPercent: -100 * direction,
+      duration: 0.6,
+      ease: "power2.inOut",
+    }).fromTo(
+      next,
+      { yPercent: 100 * direction },
+      { yPercent: 0, duration: 0.6, ease: "power2.inOut" },
+      "<"
+    );
+  };
+
   return (
-    <div className="min-h-dvh">
-      <div className="relative">
-        <div className="absolute inset-0 -z-10 brand-gradient opacity-20" />
-        <div className="mx-auto max-w-screen-sm sm:max-w-screen-md md:max-w-screen-lg lg:max-w-screen-xl px-0">
-          {feed.map((item) => (
-            <VideoCard key={item.id} item={item} />
-          ))}
-        </div>
-      </div>
+    <div
+      ref={containerRef}
+      className="relative w-full h-dvh overflow-hidden bg-black"
+    >
+     {feed.map((item, idx) => (
+  <div
+    key={item.id}
+    className={`short absolute inset-0`}
+    style={{ zIndex: feed.length - idx }}
+  >
+    <VideoCard
+      key={`${item.id}-${activeIndex === idx}`} // 🔑 force re-mount
+      item={item}
+      ref={(el: HTMLVideoElement) => (videoRefs.current[idx] = el)}
+    />
+  </div>
+))}
+
     </div>
   );
 }
